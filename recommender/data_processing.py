@@ -48,7 +48,7 @@ def split_df(
     return history, targets
 
 
-def pad_arr(arr: np.ndarray, expected_size: int = 60):
+def pad_arr(arr: np.ndarray, expected_size: int = 30):
     """
     Pad top of array when there is not enough history
     :param arr:
@@ -72,3 +72,9 @@ def pad_list(list_integers, history_size: int, pad_val: int = 0):
         list_integers = [pad_val] * (history_size - len(list_integers)) + list_integers
 
     return list_integers
+
+
+def df_to_np(df, expected_size=30):
+    arr = np.array(df)
+    arr = pad_arr(arr, expected_size=expected_size)
+    return arr

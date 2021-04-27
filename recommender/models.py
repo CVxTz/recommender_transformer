@@ -16,7 +16,6 @@ class CustomTransformerDecoderLayer(Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1):
         super(CustomTransformerDecoderLayer, self).__init__()
-        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
         self.multihead_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
 
         self.linear1 = Linear(d_model, dim_feedforward)
@@ -41,7 +40,9 @@ class CustomTransformerDecoderLayer(Module):
         self,
         tgt: Tensor,
         memory: Tensor,
+        tgt_mask: Optional[Tensor] = None,
         memory_mask: Optional[Tensor] = None,
+        tgt_key_padding_mask: Optional[Tensor] = None,
         memory_key_padding_mask: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Pass the inputs (and mask) through the decoder layer.
@@ -49,7 +50,9 @@ class CustomTransformerDecoderLayer(Module):
         Args:
             tgt: the sequence to the decoder layer (required).
             memory: the sequence from the last layer of the encoder (required).
+            tgt_mask: the mask for the tgt sequence (optional).
             memory_mask: the mask for the memory sequence (optional).
+            tgt_key_padding_mask: the mask for the tgt keys per batch (optional).
             memory_key_padding_mask: the mask for the memory keys per batch (optional).
 
         Shape:
@@ -132,18 +135,7 @@ class Recommender(pl.LightningModule):
         return src
 
     def decode_trg(self, trg_items, memory):
-        batch_size, out_sequence_len = trg_items.size(0), trg_items.size(1)
-
         trg_items = self.item_embeddings(trg_items)
-
-        pos_decoder = (
-            torch.arange(0, out_sequence_len, device=trg_items.device)
-            .unsqueeze(0)
-            .repeat(batch_size, 1)
-        )
-        pos_decoder = self.target_pos_embedding(pos_decoder)
-
-        trg_items += pos_decoder
 
         trg = trg_items.permute(1, 0, 2)
 
@@ -172,7 +164,7 @@ class Recommender(pl.LightningModule):
         y_hat = y_hat.view(-1)
         y = trg_out.view(-1)
 
-        loss = F.l1_loss(y_hat, y)
+        loss = F.mse_loss(y_hat, y)
 
         self.log("train_loss", loss)
 
@@ -186,7 +178,7 @@ class Recommender(pl.LightningModule):
         y_hat = y_hat.view(-1)
         y = trg_out.view(-1)
 
-        loss = F.l1_loss(y_hat, y)
+        loss = F.mse_loss(y_hat, y)
 
         self.log("valid_loss", loss)
 
@@ -200,7 +192,7 @@ class Recommender(pl.LightningModule):
         y_hat = y_hat.view(-1)
         y = trg_out.view(-1)
 
-        loss = F.l1_loss(y_hat, y)
+        loss = F.mse_loss(y_hat, y)
 
         self.log("test_loss", loss)
 

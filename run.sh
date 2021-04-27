@@ -1,0 +1,1 @@
+python recommender/training.py --data_csv_path /home/jenazzad/ML_DATA/movielens/ml-25m/ratings.csv
