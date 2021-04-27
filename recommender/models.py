@@ -13,6 +13,7 @@ class CustomTransformerDecoderLayer(Module):
     """
     No self attention in the decoder
     """
+
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1):
         super(CustomTransformerDecoderLayer, self).__init__()
         self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -37,20 +38,18 @@ class CustomTransformerDecoderLayer(Module):
         super(CustomTransformerDecoderLayer, self).__setstate__(state)
 
     def forward(
-            self,
-            tgt: Tensor,
-            memory: Tensor,
-            memory_mask: Optional[Tensor] = None,
-            memory_key_padding_mask: Optional[Tensor] = None,
+        self,
+        tgt: Tensor,
+        memory: Tensor,
+        memory_mask: Optional[Tensor] = None,
+        memory_key_padding_mask: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Pass the inputs (and mask) through the decoder layer.
 
         Args:
             tgt: the sequence to the decoder layer (required).
             memory: the sequence from the last layer of the encoder (required).
-            tgt_mask: the mask for the tgt sequence (optional).
             memory_mask: the mask for the memory sequence (optional).
-            tgt_key_padding_mask: the mask for the tgt keys per batch (optional).
             memory_key_padding_mask: the mask for the memory keys per batch (optional).
 
         Shape:
@@ -73,12 +72,12 @@ class CustomTransformerDecoderLayer(Module):
 
 class Recommender(pl.LightningModule):
     def __init__(
-            self,
-            vocab_size,
-            channels=128,
-            n_features=1,
-            dropout=0.4,
-            lr=1e-4,
+        self,
+        vocab_size,
+        channels=128,
+        n_features=1,
+        dropout=0.4,
+        lr=1e-4,
     ):
         super().__init__()
 
@@ -119,8 +118,8 @@ class Recommender(pl.LightningModule):
         batch_size, in_sequence_len = src.size(0), src.size(1)
         pos_encoder = (
             torch.arange(0, in_sequence_len, device=src.device)
-                .unsqueeze(0)
-                .repeat(batch_size, 1)
+            .unsqueeze(0)
+            .repeat(batch_size, 1)
         )
         pos_encoder = self.input_pos_embedding(pos_encoder)
 
@@ -139,8 +138,8 @@ class Recommender(pl.LightningModule):
 
         pos_decoder = (
             torch.arange(0, out_sequence_len, device=trg_items.device)
-                .unsqueeze(0)
-                .repeat(batch_size, 1)
+            .unsqueeze(0)
+            .repeat(batch_size, 1)
         )
         pos_decoder = self.target_pos_embedding(pos_decoder)
 
