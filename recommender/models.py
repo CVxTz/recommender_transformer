@@ -148,4 +148,14 @@ class Recommender(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        scheduler = torch.optim.lr_scheduler.CyclicLR(
+            optimizer,
+            base_lr=self.lr / 100,
+            max_lr=self.lr * 10,
+            step_size_up=5000,
+            step_size_down=5000,
+            mode="exp_range",
+            gamma=0.95
+        )
+        return [optimizer], [scheduler]
