@@ -8,29 +8,22 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch.utils.data import DataLoader
 
 from recommender.models import Recommender
-from recommender.data_processing import split_df, df_to_np, pad_list, map_column
+from recommender.data_processing import get_context, pad_list, map_column, MASK
 
 
-def shuffle(l1, l2):
-    l3 = list(zip(l1, l2))
+def mask_list(l1):
 
-    random.shuffle(l3)
+    l1 = [a if random.random() < 0.8 else MASK for a in l1]
 
-    l1, l2 = zip(*l3)
-
-    return l1, l2
+    return l1
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(
-        self, groups, grp_by, split, items_max, history_size=60, horizon_size=5
-    ):
+    def __init__(self, groups, grp_by, split, history_size=30):
         self.groups = groups
         self.grp_by = grp_by
         self.split = split
         self.history_size = history_size
-        self.horizon_size = horizon_size
-        self.items_max = items_max
 
     def __len__(self):
         return len(self.groups)
@@ -40,23 +33,20 @@ class Dataset(torch.utils.data.Dataset):
 
         df = self.grp_by.get_group(group)
 
-        src, trg = split_df(df, split=self.split)
+        context = get_context(df, split=self.split)
 
-        src_items = src["movieId_mapped"].tolist()
+        trg_items = context["movieId_mapped"].tolist()
 
+        src_items = mask_list(trg_items)
+
+        trg_items = pad_list(trg_items, history_size=self.history_size)
         src_items = pad_list(src_items, history_size=self.history_size)
-        src_features = df_to_np(src[["rating"]], expected_size=self.history_size)
-
-        trg_items = trg["movieId_mapped"].tolist() + [random.randint(0, self.items_max)]
-        trg_out = trg["rating"].tolist() + [1.0]
 
         src_items = torch.tensor(src_items, dtype=torch.long)
-        src_features = torch.tensor(src_features, dtype=torch.float)
 
         trg_items = torch.tensor(trg_items, dtype=torch.long)
-        trg_out = torch.tensor(trg_out, dtype=torch.float)
 
-        return src_items, src_features, trg_items, trg_out
+        return src_items, trg_items
 
 
 def train(
@@ -66,7 +56,6 @@ def train(
     batch_size: int = 32,
     epochs: int = 2000,
     history_size: int = 60,
-    horizon_size: int = 5,
 ):
     data = pd.read_csv(data_csv_path)
 
@@ -83,16 +72,12 @@ def train(
         grp_by=grp_by_train,
         split="train",
         history_size=history_size,
-        horizon_size=horizon_size,
-        items_max=max(mapping.values()),
     )
     val_data = Dataset(
         groups=groups,
         grp_by=grp_by_train,
         split="val",
         history_size=history_size,
-        horizon_size=horizon_size,
-        items_max=max(mapping.values()),
     )
 
     print("len(train_data)", len(train_data))
@@ -112,8 +97,7 @@ def train(
     )
 
     model = Recommender(
-        vocab_size=len(mapping) + 1,
-        n_features=1,
+        vocab_size=len(mapping) + 2,
         lr=1e-4,
         dropout=0.3,
     )

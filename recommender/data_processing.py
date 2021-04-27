@@ -23,18 +23,19 @@ def map_column(df: pd.DataFrame, col_name: str):
     return df, mapping, inverse_mapping
 
 
-def split_df(df: pd.DataFrame, split: str, context_size: int = 30):
+def get_context(df: pd.DataFrame, split: str, context_size: int = 30):
     """
     Create a training / validation samples
     Validation samples are the last horizon_size rows
     :param df:
     :param split:
     :param context_size:
-    :param horizon_size:
     :return:
     """
     if split == "train":
-        end_index = random.randint(context_size, df.shape[0] - context_size)
+        end_index = random.randint(
+            context_size, max(df.shape[0] - context_size, context_size)
+        )
     elif split in ["val", "test"]:
         end_index = df.shape[0]
     else:

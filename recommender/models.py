@@ -25,7 +25,7 @@ def masked_ce(y_pred, y_true, mask):
 
     loss = loss * mask
 
-    return loss.mean()
+    return loss.sum() / (mask.sum() + 1e-8)
 
 
 class Recommender(pl.LightningModule):
@@ -98,7 +98,8 @@ class Recommender(pl.LightningModule):
         y_pred = y_pred.view(-1, y_pred.size(2))
         y_true = y_true.view(-1)
 
-        mask = y_true == self.mask
+        src_items = src_items.view(-1)
+        mask = src_items == self.mask
 
         loss = masked_ce(y_pred=y_pred, y_true=y_true, mask=mask)
         accuracy = masked_accuracy(y_pred=y_pred, y_true=y_true, mask=mask)
@@ -116,7 +117,8 @@ class Recommender(pl.LightningModule):
         y_pred = y_pred.view(-1, y_pred.size(2))
         y_true = y_true.view(-1)
 
-        mask = y_true == self.mask
+        src_items = src_items.view(-1)
+        mask = src_items == self.mask
 
         loss = masked_ce(y_pred=y_pred, y_true=y_true, mask=mask)
         accuracy = masked_accuracy(y_pred=y_pred, y_true=y_true, mask=mask)
@@ -134,7 +136,8 @@ class Recommender(pl.LightningModule):
         y_pred = y_pred.view(-1, y_pred.size(2))
         y_true = y_true.view(-1)
 
-        mask = y_true == self.mask
+        src_items = src_items.view(-1)
+        mask = src_items == self.mask
 
         loss = masked_ce(y_pred=y_pred, y_true=y_true, mask=mask)
         accuracy = masked_accuracy(y_pred=y_pred, y_true=y_true, mask=mask)
