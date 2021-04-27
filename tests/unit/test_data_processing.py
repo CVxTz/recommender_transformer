@@ -1,5 +1,6 @@
-import pytest
 import pandas as pd
+import pytest
+
 from recommender.data_processing import map_column
 
 
@@ -10,7 +11,6 @@ def data():
 
 
 def test_map_column(data):
-
     df, mapping, inverse_mapping = map_column(data, col_name="id")
 
     assert mapping == {

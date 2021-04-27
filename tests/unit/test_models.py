@@ -1,4 +1,5 @@
 import torch
+
 from recommender.models import Recommender
 
 
@@ -17,6 +18,8 @@ def test_recommender():
 
     assert out.shape == torch.Size([32, 5, 1])
 
-    loss = recommender.training_step((src_items, src_features, trg_items, trg_out), batch_idx=1)
+    loss = recommender.training_step(
+        (src_items, src_features, trg_items, trg_out), batch_idx=1
+    )
 
     assert isinstance(loss, torch.Tensor)

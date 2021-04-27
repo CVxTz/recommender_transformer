@@ -1,6 +1,7 @@
-import pandas as pd
-import numpy as np
 import random
+
+import numpy as np
+import pandas as pd
 
 
 def map_column(df: pd.DataFrame, col_name: str):
@@ -20,7 +21,7 @@ def map_column(df: pd.DataFrame, col_name: str):
 
 
 def split_df(
-    df: pd.DataFrame, split: str, history_size: int = 30, horizon_size: int = 5
+        df: pd.DataFrame, split: str, history_size: int = 30, horizon_size: int = 5
 ):
     """
     Create a training / validation samples
