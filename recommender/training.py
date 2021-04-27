@@ -47,9 +47,7 @@ class Dataset(torch.utils.data.Dataset):
         src_items = pad_list(src_items, history_size=self.history_size)
         src_features = df_to_np(src[["rating"]], expected_size=self.history_size)
 
-        trg_items = trg["movieId_mapped"].tolist() + [
-            random.randint(0, self.items_max)
-        ]
+        trg_items = trg["movieId_mapped"].tolist() + [random.randint(0, self.items_max)]
         trg_out = trg["rating"].tolist() + [1.0]
 
         src_items = torch.tensor(src_items, dtype=torch.long)
@@ -86,7 +84,7 @@ def train(
         split="train",
         history_size=history_size,
         horizon_size=horizon_size,
-        items_max=max(mapping.values())
+        items_max=max(mapping.values()),
     )
     val_data = Dataset(
         groups=groups,
@@ -94,7 +92,7 @@ def train(
         split="val",
         history_size=history_size,
         horizon_size=horizon_size,
-        items_max=max(mapping.values())
+        items_max=max(mapping.values()),
     )
 
     print("len(train_data)", len(train_data))

@@ -9,17 +9,13 @@ def test_recommender():
     recommender = Recommender(vocab_size=1000)
 
     src_items = torch.randint(low=0, high=n_items, size=(32, 30))
-    src_features = torch.rand(32, 30, 1)
 
-    trg_items = torch.randint(low=0, high=n_items, size=(32, 5))
-    trg_out = torch.randint(low=0, high=n_items, size=(32, 5, 1))
+    trg_out = torch.randint(low=0, high=n_items, size=(32, 30))
 
-    out = recommender((src_items, src_features, trg_items))
+    out = recommender(src_items)
 
-    assert out.shape == torch.Size([32, 5, 1])
+    assert out.shape == torch.Size([32, 30, 1000])
 
-    loss = recommender.training_step(
-        (src_items, src_features, trg_items, trg_out), batch_idx=1
-    )
+    loss = recommender.training_step((src_items, trg_out), batch_idx=1)
 
     assert isinstance(loss, torch.Tensor)

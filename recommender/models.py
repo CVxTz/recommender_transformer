@@ -3,74 +3,29 @@ from typing import Optional
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from torch import Tensor
 from torch.nn import Linear
-from torch.nn import Module, MultiheadAttention, Dropout, LayerNorm
 from torch.nn import functional as F
 
 
-class CustomTransformerDecoderLayer(Module):
-    """
-    No self attention in the decoder
-    """
+def masked_accuracy(y_pred: torch.Tensor, y_true: torch.Tensor, mask: torch.Tensor):
 
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1):
-        super(CustomTransformerDecoderLayer, self).__init__()
-        self.multihead_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+    _, predicted = torch.max(y_pred, 1)
 
-        self.linear1 = Linear(d_model, dim_feedforward)
-        self.dropout = Dropout(dropout)
-        self.linear2 = Linear(dim_feedforward, d_model)
+    y_true = torch.masked_select(y_true, mask)
+    predicted = torch.masked_select(predicted, mask)
 
-        self.norm1 = LayerNorm(d_model)
-        self.norm2 = LayerNorm(d_model)
-        self.norm3 = LayerNorm(d_model)
-        self.dropout1 = Dropout(dropout)
-        self.dropout2 = Dropout(dropout)
-        self.dropout3 = Dropout(dropout)
+    acc = (y_true == predicted).double().mean()
 
-        self.activation = F.relu
+    return acc
 
-    def __setstate__(self, state):
-        if "activation" not in state:
-            state["activation"] = F.relu
-        super(CustomTransformerDecoderLayer, self).__setstate__(state)
 
-    def forward(
-        self,
-        tgt: Tensor,
-        memory: Tensor,
-        tgt_mask: Optional[Tensor] = None,
-        memory_mask: Optional[Tensor] = None,
-        tgt_key_padding_mask: Optional[Tensor] = None,
-        memory_key_padding_mask: Optional[Tensor] = None,
-    ) -> Tensor:
-        r"""Pass the inputs (and mask) through the decoder layer.
+def masked_ce(y_pred, y_true, mask):
 
-        Args:
-            tgt: the sequence to the decoder layer (required).
-            memory: the sequence from the last layer of the encoder (required).
-            tgt_mask: the mask for the tgt sequence (optional).
-            memory_mask: the mask for the memory sequence (optional).
-            tgt_key_padding_mask: the mask for the tgt keys per batch (optional).
-            memory_key_padding_mask: the mask for the memory keys per batch (optional).
+    loss = F.cross_entropy(y_pred, y_true, reduction="none")
 
-        Shape:
-            see the docs in Transformer class.
-        """
-        tgt2 = self.multihead_attn(
-            tgt,
-            memory,
-            memory,
-            attn_mask=memory_mask,
-            key_padding_mask=memory_key_padding_mask,
-        )[0]
-        tgt = tgt + self.dropout2(tgt2)
-        tgt = self.norm2(tgt)
-        tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
-        tgt = tgt + self.dropout3(tgt2)
-        tgt = self.norm3(tgt)
-        return tgt
+    loss = loss * mask
+
+    return loss.mean()
 
 
 class Recommender(pl.LightningModule):
@@ -78,11 +33,15 @@ class Recommender(pl.LightningModule):
         self,
         vocab_size,
         channels=128,
-        n_features=1,
+        cap=0,
+        mask=1,
         dropout=0.4,
         lr=1e-4,
     ):
         super().__init__()
+
+        self.cap = cap
+        self.mask = mask
 
         self.lr = lr
         self.dropout = dropout
@@ -93,108 +52,95 @@ class Recommender(pl.LightningModule):
         )
 
         self.input_pos_embedding = torch.nn.Embedding(512, embedding_dim=channels)
-        self.target_pos_embedding = torch.nn.Embedding(512, embedding_dim=channels)
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=channels, nhead=4, dropout=self.dropout
         )
-        decoder_layer = CustomTransformerDecoderLayer(
-            d_model=channels, nhead=4, dropout=self.dropout
-        )
 
-        self.encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=4)
-        self.decoder = torch.nn.TransformerDecoder(decoder_layer, num_layers=2)
+        self.encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=6)
 
-        self.project = Linear(n_features + channels, channels)
-
-        self.linear_out = Linear(channels, 1)
+        self.linear_out = Linear(channels, self.vocab_size)
 
         self.do = nn.Dropout(p=self.dropout)
 
-    def encode_src(self, src_items, src_features):
+    def encode_src(self, src_items):
         src_items = self.item_embeddings(src_items)
 
-        src = torch.cat(tensors=[src_items, src_features], dim=-1)
-
-        src = self.project(src)
-
-        batch_size, in_sequence_len = src.size(0), src.size(1)
+        batch_size, in_sequence_len = src_items.size(0), src_items.size(1)
         pos_encoder = (
-            torch.arange(0, in_sequence_len, device=src.device)
+            torch.arange(0, in_sequence_len, device=src_items.device)
             .unsqueeze(0)
             .repeat(batch_size, 1)
         )
         pos_encoder = self.input_pos_embedding(pos_encoder)
 
-        src += pos_encoder
+        src_items += pos_encoder
 
-        src = src.permute(1, 0, 2)
+        src = src_items.permute(1, 0, 2)
 
         src = self.encoder(src)
 
-        return src
+        return src.permute(1, 0, 2)
 
-    def decode_trg(self, trg_items, memory):
-        trg_items = self.item_embeddings(trg_items)
+    def forward(self, src_items):
 
-        trg = trg_items.permute(1, 0, 2)
+        src = self.encode_src(src_items)
 
-        out = self.decoder(tgt=trg, memory=memory)
-
-        out = out.permute(1, 0, 2)
-
-        out = self.linear_out(out)
-
-        return out
-
-    def forward(self, x):
-        src_items, src_features, trg_items = x
-
-        src = self.encode_src(src_items, src_features)
-
-        out = self.decode_trg(trg_items=trg_items, memory=src)
+        out = self.linear_out(src)
 
         return out
 
     def training_step(self, batch, batch_idx):
-        src_items, src_features, trg_items, trg_out = batch
+        src_items, y_true = batch
 
-        y_hat = self((src_items, src_features, trg_items))
+        y_pred = self(src_items)
 
-        y_hat = y_hat.view(-1)
-        y = trg_out.view(-1)
+        y_pred = y_pred.view(-1, y_pred.size(2))
+        y_true = y_true.view(-1)
 
-        loss = F.mse_loss(y_hat, y)
+        mask = y_true == self.mask
+
+        loss = masked_ce(y_pred=y_pred, y_true=y_true, mask=mask)
+        accuracy = masked_accuracy(y_pred=y_pred, y_true=y_true, mask=mask)
 
         self.log("train_loss", loss)
+        self.log("train_accuracy", accuracy)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
-        src_items, src_features, trg_items, trg_out = batch
+        src_items, y_true = batch
 
-        y_hat = self((src_items, src_features, trg_items))
+        y_pred = self(src_items)
 
-        y_hat = y_hat.view(-1)
-        y = trg_out.view(-1)
+        y_pred = y_pred.view(-1, y_pred.size(2))
+        y_true = y_true.view(-1)
 
-        loss = F.mse_loss(y_hat, y)
+        mask = y_true == self.mask
+
+        loss = masked_ce(y_pred=y_pred, y_true=y_true, mask=mask)
+        accuracy = masked_accuracy(y_pred=y_pred, y_true=y_true, mask=mask)
 
         self.log("valid_loss", loss)
+        self.log("valid_accuracy", accuracy)
 
         return loss
 
     def test_step(self, batch, batch_idx):
-        src_items, src_features, trg_items, trg_out = batch
+        src_items, y_true = batch
 
-        y_hat = self((src_items, src_features, trg_items))
+        y_pred = self(src_items)
 
-        y_hat = y_hat.view(-1)
-        y = trg_out.view(-1)
+        y_pred = y_pred.view(-1, y_pred.size(2))
+        y_true = y_true.view(-1)
 
-        loss = F.mse_loss(y_hat, y)
+        mask = y_true == self.mask
+
+        loss = masked_ce(y_pred=y_pred, y_true=y_true, mask=mask)
+        accuracy = masked_accuracy(y_pred=y_pred, y_true=y_true, mask=mask)
 
         self.log("test_loss", loss)
+        self.log("test_accuracy", accuracy)
 
         return loss
 

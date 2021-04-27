@@ -3,6 +3,9 @@ import random
 import numpy as np
 import pandas as pd
 
+PAD = 0
+MASK = 1
+
 
 def map_column(df: pd.DataFrame, col_name: str):
     """
@@ -12,7 +15,7 @@ def map_column(df: pd.DataFrame, col_name: str):
     :return:
     """
     values = sorted(list(df[col_name].unique()))
-    mapping = {k: i + 1 for i, k in enumerate(values)}
+    mapping = {k: i + 2 for i, k in enumerate(values)}
     inverse_mapping = {v: k for k, v in mapping.items()}
 
     df[col_name + "_mapped"] = df[col_name].map(mapping)
@@ -20,32 +23,28 @@ def map_column(df: pd.DataFrame, col_name: str):
     return df, mapping, inverse_mapping
 
 
-def split_df(
-    df: pd.DataFrame, split: str, history_size: int = 30, horizon_size: int = 5
-):
+def split_df(df: pd.DataFrame, split: str, context_size: int = 30):
     """
     Create a training / validation samples
     Validation samples are the last horizon_size rows
     :param df:
     :param split:
-    :param history_size:
+    :param context_size:
     :param horizon_size:
     :return:
     """
     if split == "train":
-        end_index = random.randint(horizon_size + 1, df.shape[0] - horizon_size)
+        end_index = random.randint(context_size, df.shape[0] - context_size)
     elif split in ["val", "test"]:
         end_index = df.shape[0]
     else:
         raise ValueError
 
-    label_index = end_index - horizon_size
-    start_index = max(0, label_index - history_size)
+    start_index = max(0, end_index - context_size)
 
-    history = df[start_index:label_index]
-    targets = df[label_index:end_index]
+    context = df[start_index:end_index]
 
-    return history, targets
+    return context
 
 
 def pad_arr(arr: np.ndarray, expected_size: int = 30):
@@ -59,7 +58,7 @@ def pad_arr(arr: np.ndarray, expected_size: int = 30):
     return arr
 
 
-def pad_list(list_integers, history_size: int, pad_val: int = 0):
+def pad_list(list_integers, history_size: int, pad_val: int = PAD):
     """
 
     :param list_integers:
