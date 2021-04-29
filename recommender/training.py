@@ -11,15 +11,22 @@ from recommender.models import Recommender
 from recommender.data_processing import get_context, pad_list, map_column, MASK
 
 
-def mask_list(l1):
+def mask_list(l1, p=0.8):
 
-    l1 = [a if random.random() < 0.8 else MASK for a in l1]
+    l1 = [a if random.random() < p else MASK for a in l1]
+
+    return l1
+
+
+def mask_last_elements_list(l1, val_context_size: int = 5):
+
+    l1 = l1[:-val_context_size] + mask_list(l1[-val_context_size:], p=0.5)
 
     return l1
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, groups, grp_by, split, history_size=30):
+    def __init__(self, groups, grp_by, split, history_size=120):
         self.groups = groups
         self.grp_by = grp_by
         self.split = split
@@ -33,14 +40,18 @@ class Dataset(torch.utils.data.Dataset):
 
         df = self.grp_by.get_group(group)
 
-        context = get_context(df, split=self.split)
+        context = get_context(df, split=self.split, context_size=self.history_size)
 
         trg_items = context["movieId_mapped"].tolist()
 
-        src_items = mask_list(trg_items)
+        if self.split == "train":
+            src_items = mask_list(trg_items)
+        else:
+            src_items = mask_last_elements_list(trg_items)
 
-        trg_items = pad_list(trg_items, history_size=self.history_size)
-        src_items = pad_list(src_items, history_size=self.history_size)
+        pad_mode = "left" if random.random() < 0.5 else "right"
+        trg_items = pad_list(trg_items, history_size=self.history_size, mode=pad_mode)
+        src_items = pad_list(src_items, history_size=self.history_size, mode=pad_mode)
 
         src_items = torch.tensor(src_items, dtype=torch.long)
 
@@ -55,7 +66,7 @@ def train(
     model_dir: str = "recommender_models",
     batch_size: int = 32,
     epochs: int = 2000,
-    history_size: int = 60,
+    history_size: int = 120,
 ):
     data = pd.read_csv(data_csv_path)
 
