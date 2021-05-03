@@ -1,5 +1,7 @@
 # recommender_transformer
 
+Blog : https://towardsdatascience.com/build-your-own-movie-recommender-system-using-bert4rec-92e4e34938c5 
+
 ### Setup (GPU)
 ```
 conda create -n py38 python=3.8
