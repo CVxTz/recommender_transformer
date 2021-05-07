@@ -9,7 +9,7 @@ conda activate py38
 conda install pytorch torchvision cudatoolkit=11.1 -c pytorch -c conda-forge
 conda install -c conda-forge jupyterlab
 conda install -c conda-forge matplotlib
-https://github.com/CVxTz/recommender_transformer
+git clone https://github.com/CVxTz/recommender_transformer
 cd recommender_transformer
 pip install .
 ```
