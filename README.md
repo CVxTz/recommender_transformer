@@ -16,7 +16,7 @@ pip install .
 ### Docker (CPU)
 ```bash
 docker build . -t recommender
-ocker run recommender sh -c "python3.8 -m pytest"
+docker run recommender sh -c "python3.8 -m pytest"
 ```
 
 ### References
