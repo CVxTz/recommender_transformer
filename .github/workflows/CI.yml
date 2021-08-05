@@ -34,7 +34,7 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       
       - name: Build docker image
-        run: docker build . -t crack_captcha
+        run: docker build . -t recommender_transformer
 
       - name: Run tests
-        run: docker run crack_captcha sh -c "python3.8 -m pytest"
+        run: docker run recommender_transformer sh -c "python3.8 -m pytest"
